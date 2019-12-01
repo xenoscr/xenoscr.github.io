@@ -4,12 +4,12 @@ title: About
 permalink: /about/
 ---
 
-Some information about you!
+I am a hopeless knowledge seeker. I have a drive to learn how things work, to better understand them.
 
 ### More Information
 
-A place to include any other types of information that you'd like to include about yourself.
+OSCP & OSCE certified professional with over 20 years in Information technology and Information Security experience.
 
 ### Contact me
 
-[email@domain.com](mailto:email@domain.com)
+[@xenoscr](https://twitter.com/xenosCR)
