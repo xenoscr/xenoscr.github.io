@@ -6,6 +6,8 @@ While studying for my [Offensive Security Certified Expert (OSCE)](https://www.o
 
 I will not cover all possible methods to find **EIP** and **RIP** in this blog post. I will cover ones that I am familiar with and have researched. If you are interested in finding more methods, I encourage you to do your own research and embark on your own learning journey. What you see here is the result of my own learning journey, I hope that it helps you in some way. I am also aware that these topics have been covered by many over the years and are nothing new, the point is not to present something new but to aid in my own learning process and maybe, help someone else begin their own journey.
 
+**EDIT:** Thanks to a great reply from [@TheColonial](https://twitter.com/TheColonial) to my Twitter announcement of this blog I was able to add a variation to the FPU method. Thanks again for the tip! The updated section can be found [here](#method-1-alternate---using-subtraction).
+
 # Finding EIP: 32-bit Assembly Methods
 
 I will begin with the methods I found to locate **EIP** using x86 Assembly (32-bit) instructions. There are two methods and they both can be useful depending on the situation and restrictions that you may be facing. Both methods will accomplish the same goal of finding **EIP**. The first method that I will detail is slightly smaller than the second, by a single byte. Both methods accomplish the exact same objective, to store the value of **EIP** in the **EAX** register. Both methods are NULL (0x00) byte free. The reason you would use one over the other comes down to size or character restrictions that you may encounter.
@@ -62,6 +64,31 @@ Run the resulting PE file in your favorite debugger and see how it works. You wi
 </p>
 <p align="center">
     <em>Figure 2: EAX points to EIP</em>
+</p>
+### Method 1 Alternate - Using Subtraction
+Thanks to advice from [@TheColonial](https://twitter.com/TheColonial) to use subtraction from the **EAX** register instead of an **add al** instruction to avoid failure in certain situations, I am adding this alternate method. The issue, as he correctly pointed out, is that by adding to the **AL** register it is possible that if the additioin would result in a carry, that **EAX** would point to the wrong location. For example, if the **AL** register contains anything greater than or equal to **0xF9** adding **0x07** to it would result in the carried 1 being dropped. For example, if **EAX** contains **0x001234F9** and we add **0x07** to the **AL** register (**0xF9**), the resulting value will be **0x00123400** not the **0x00123500** we need.
+
+To overcome this issue, and avoid null bytes, it is possible to subtract a negative value from **EAX**. Basic arithmatic, subtracting a negative value results in addition. Simple but effective. The corrected code is below and avoids NULL bytes and is only one byte larger:
+{% highlight Nasm linenos %}
+[SECTION .text]
+
+BITS 32
+
+global _start
+
+_start:
+    fldz
+    fnstenv [esp-0x0C]
+    pop eax
+    sub eax, -0x07
+{% endhighlight %}
+In **Figure 9** we can see that the suggested code does work and would be more reliable than the original code.
+
+<p align="center">
+    <img src="/resources/images/2019-12-01-Finding-EIP/figure9.png" alt="Figure 9: EAX Points to EIP">
+</p>
+<p align="center">
+    <em>Figure 9: EAX points to EIP</em>
 </p>
 ## Method 2: Using Jumps and Calls
 The second metod is just one byte longer than the first and accomplishes the goal of storing the value of **EIP** in the **EAX** register. I learned of this method from [Phrack issue 62, Phile 7](http://phrack.org/issues/62/7.html#article) titled *History and Advances in Windows Shellcode*. This article was written by SK Chong. To get **EIP** this method uses a series of jumps and calls that result in the value of EIP being stored in **EAX**. The original files from SK Chong's article are no longer available but, I was able to track down a few of them. In his examples, he used **db** entries to hard code these jumps and calls. The version I am about to present can be more easily read and assembled with **nasm**.
