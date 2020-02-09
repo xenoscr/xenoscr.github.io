@@ -107,6 +107,9 @@ _start:
         add ecx, 0x04                       ; Length of kernel32 hash list
         call resolve_symbols_for_dll
 {% endhighlight %}
+<p align="center">
+    <em>Code Listing 1: Full 32-Bit Function Locating Assemly Listing</em>
+</p>
 
 # The Main Function
 ## Setup the Stack and Storage
@@ -124,13 +127,21 @@ Lines **91** through **93** are setting up our storage location. **ESI**, and **
 # Resolving Symbols
 This is where things start to get more interesting. On line **94** the **resolve_symbols_for_dll** function is called. It is important to remember that the base address of **kernel32** is currently stored in the **EDX** register. This will be important later.
 
-For the moment, we will focus on just this function and ignore the call to the **find_function** function. We'll reference the following code block so we will not need to scroll back-and-forth too much. 
-1. The **lodsd** instruction loads the value stored at **ESI** into the **EAX** register and increments **ESI** to point to the next address. If our code were looking for more than one function **ESI** would be ready and pointing to the next encoded function name.
-2. **EAX**, now containing the encoded value of our first function name and **EDX**, which contains the address of **kernel32**, are then pushed to the stack. 
+For the moment, we will focus on just this function and ignore the call to the **find_function** function. We'll reference **Code Listing 2** to avoid scrolling back-and-forth too much. 
+
+1. On line **3**, the **lodsd** instruction loads the value stored at **ESI** into the **EAX** register and increments **ESI** to point to the next address. If our code were looking for more than one function **ESI** would be ready and pointing to the next encoded function name.
+
+2. **EAX**, now containing the encoded value of our first function name and **EDX**, which contains the address of **kernel32**, are then pushed to the stack on lines **4** and **5**. 
+
 3. We will skip over the call to **find_function** for now. All that is important to know is that **EAX** now contains the address of the function we are looking for after it returns. 
-4. That address is then stored in the location where **EDI** points. 
-5. We restore the stack and increment **EDI** to point to the next address. 
-6. We then compare **ESI** and **ECX** to see if we reached the end of the list. If we have not, the function loops until the end of the list is reached.
+
+4. On line **7**, the address of the resolved function is stored at the address where **EDI** currently points. 
+
+5. Line **8** restore the stack to its original state before **EAX** and **EDX** were pushed to it.
+
+6. On line **9**, **EDI** is incremented to point to the next location where a function address can be stored.
+
+7. **ESI** and **ECX** is then compared to see if the end of the hashed function list has been reached. If we have not, the function loops until the end of the list is reached. If the end has been reached, the function returns.
 
 {% highlight Nasm linenos %}
     ; ======== Function: resolve_symbols_for_dll
@@ -147,11 +158,16 @@ For the moment, we will focus on just this function and ignore the call to the *
     resolve_symbols_for_dll_finished:
         ret
 {% endhighlight %}
+<p align="center">
+    <em>Code Listing 2: 32-Bit Resolve Symbols Function</em>
+</p>
 
 ## Finding the Function Addresses
-This is the part I know you have been waiting for. How are we finding the Win32 API function Addresses? Once again, we'll refer to the following code blocks to avoid unnecessary scrolling.
+Now to cover the two most important sections of Assembly code in this installment. The first bit of Assembly code is responsible for locating the **_IMAGE_EXPORT_DIRECTORY** by navigating the [PE file Structure](https://docs.microsoft.com/en-us/windows/win32/debug/pe-format). Once the **_IMAGE_EXPORT_DIRECTORY** structure is located the second section of Assembly code in **Code Listing 4** will iterate through a list of function names to find the function that matches the function being searched for. Finally, the located address will be saved to a location where it can be later referenced to make function calls.
 
 ### Locating the Exported Function Names
+The first section of code in **Code Listing 3** will locate the **_IMAGE_EXPORT_DIRECTORY** structure. Once the structure has been located, the number of exported functions that is stored in the **NumberOfFunctions** variable and the RVA of a list of exported function names stored in the **AddressOfNames** variable will be collected. These two values are needed to iterate through the exported function names to find the function that matches what is being searched for. Once the matching function is located the **AddressOfNameOrdinals** will be used to obtain the exported functions address.
+
 {% highlight Nasm linenos %}
     ; ======= Function: find_function
     find_function:
@@ -164,16 +180,21 @@ This is the part I know you have been waiting for. How are we finding the Win32 
         mov ebx, [edx+0x20]
         add ebx, ebp
 {% endhighlight %}
+<p align="center">
+    <em>Code Listing 3: 32-Bit Find Function: Locate _IMAGE_EXPORT_DIRECTORY</em>
+</p>
 
-1. The first thing this function does is use a **PUSHAD** instruction to store all of the current registers so that they can be restored before the function returns. The **PUSHAD** command places the registers on the stack in the following order (top-down): **EAX, ECX, EDX, EBX, Original ESP, EBP, ESI, and EDI**
+The following step-by-step walk-through will refer to line numbers from **Code Listing 3**:
 
-2. The value located at **ESP** + **0x24** (36 bytes) is then moved to the **EBP** register. Recall that prior to calling the **find_function** function that **EAX** (the hash value) and **EDX** (the base address of kernel32) were pushed to the stack, where **ESP** used to point prior to the **PUSHAD** instruction. What this means is the **EBP** now contains the base address of **Kernel32**.
+1. One line **3**, a **PUSHAD** instruction is used to store all of the current registers on the stack. Once the function completes a **POPAD** instruction will be used to restore the registers. The **PUSHAD** command places the registers on the stack in the following order (top-down): **EAX, ECX, EDX, EBX, Original ESP, EBP, ESI, and EDI**
 
-3. The next move instruction loads the value located at an offset of **0x3C** from the base address of **Kernel32** into the **EAX** register. According to the [PE Structure](https://en.wikipedia.org/wiki/Portable_Executable#/media/File:Portable_Executable_32_bit_Structure_in_SVG_fixed.svg) diagram, the base address of the **PE Header** is located at an offset of **0x3C** from the base address of a PE file. This means that **EAX** now contains the offset from the base of **Kernel32** to the address of the **PE Header**.
+2. The base address of **kernel32.dll**, currently stored on the stack at **ESP** + **0x24** (36 bytes) is then moved to the **EBP** register on line **4**.
 
-4. The next move instruction adds the **EBP** (Kernel32's Base Address) to **EAX** (PE Header offset) and **0x78** and stores the value located there in the **EDX** register. Looking back at the [PE Structure](https://en.wikipedia.org/wiki/Portable_Executable#/media/File:Portable_Executable_32_bit_Structure_in_SVG_fixed.svg) diagram, the offset value of the **ExportTable** structure is located at that location. This means that **EDX** now contains the value of the offset of the **Export Table** from the base of **Kernel32**.
+3. The move instruction on line **5** loads the value located at an offset of **0x3C** from the base address of **kernel32.dll** into the **EAX** register. According to the [PE Structure](https://en.wikipedia.org/wiki/Portable_Executable#/media/File:Portable_Executable_32_bit_Structure_in_SVG_fixed.svg) diagram, the base address of the **PE Header** is located at an offset of **0x3C** from the base address of a PE file. **EAX** now contains the offset from the base of **kernel32.dll** to the address of the **PE Header**.
 
-5. **EBP** (Kernel32's Base Address) is added to **EDX** (The export table's offset) so that **EDX** now points to the **Export Table** structure. The **Export Table**'s structure can be seen in **Figure 1**.
+4. The move instruction on line **6** adds **EBP** (kernel32.dll's Base Address), **EAX** (PE Header offset) and, **0x78** together and stores the result in the **EDX** register. Looking back at the [PE Structure](https://en.wikipedia.org/wiki/Portable_Executable#/media/File:Portable_Executable_32_bit_Structure_in_SVG_fixed.svg) diagram, the offset value of the **ExportTable** structure is located at that location. **EDX** now contains the value of the offset of the **Export Table** from the base of **kernel32.dll**.
+
+5. **EBP** (kernel32.dll's Base Address) is added to **EDX** (The offset to the _IMAGE_EXPORT_DIRECTORY) on line **7**. **EDX** now points to the **_IMAGE_EXPORT_DIRECTORY** structure. The structure's layout can be seen in **Figure 1**.
 
 {% highlight c %}
 typedef struct _IMAGE_EXPORT_DIRECTORY {
@@ -195,14 +216,14 @@ typedef struct _IMAGE_EXPORT_DIRECTORY {
 </p>
 
 {:start="6"}
-6. **EDX** + **0x18** is stored in **ECX**. If we refer to the structure of the **Export Table** in **Figure 1**, we can see that **NuberOfNames** is located there. **ECX** now holds the number of exported functions.
+6. **0x18** is added to **EDX** and stored in **ECX** on line **8**. According to the **_IMAGE_EXPORT_DIRECTORY** structure in **Figure 1**, the **NuberOfNames** variable is located at an offset of **0x18**. **ECX** now holds the number of exported functions.
 
-7. **EDX** + **0x20** is stored in **EBX**. Again, referring to the structure of the **Export Table** in **Figure 1**, we can see that this offset points to a list of function names. **EBX** now contains the offset from the base of **Kernel32** containing a list of exported function names.
+7. **0x20** is added to **EDX** and stored in **EBX** on line **9**. According to the **_IMAGE_EXPORT_DIRECTORY** structure in **Figure 1**, the **AddressOfNames** variable is located at an offset of **0x20**. This variable contains the relative offset from the base of **kernel32.dll** to a list of exported function names.
 
-8. **EBP** is added to **EDX**, which now points to the list of exported function names.
+8. On line **10** **EBP** is added to **EDX**. **EDX** now points to a list of exported function names.
 
 ### Iterating the Function Names to Find a Match
-The next section of code will iterate the list of function names that is now stored in the **EBX** register hashing them one at a time and comparing them to the hashed value that is stored in our assembly code.
+The next section of code will iterate through the **AddressOfNames** list pointed to by **EBX**. It will work through the list, backwards, hashing each of the names and comparing them to the hashed value that is stored in our assembly code. When a match is found, the value will be stored where **EDI** pointed, prior to calling the **find_function** function. That previous value of **EDI** is currently located on the stack for safe keeping since this function is going to reuse **EDI** to store the calculated hash for the current function name being checked. The following step-by-step walk-through will refer to the code in **Code Listing 4**.
 
 {% highlight Nasm linenos %}
     find_function_loop:
@@ -238,20 +259,25 @@ The next section of code will iterate the list of function names that is now sto
         popad
         ret
 {% endhighlight %}
+<p align="center">
+    <em>Code Listing 4: 32-Bit Iterate Function List</em>
+</p>
 
-1. There is first a check to see if **ECX** is zero. If **ECX** has reached zero the function will finish by restoring the registers and returning.
+1. Line **2** checks to see if **ECX** is zero. If **ECX** has reached zero the function will finish by restoring the registers and returning.
 
-2. **ECX** is decreased by one, then the value pointed to by **EBX** (The list of function names) + **ECX** (Number of exported names) * **4** is moved into **ESI**. We are looking backwards from the end of the list, to the beginning. **ESI** now contains the offset of the sting containing the last function name from the base of **Kernel32**.
+2. On line **3**, **ECX** is decreased by one, This indicates that the code will iterate the list in reverse.
 
-3. **EBP** (Kernel32's Base Address) is then added to **ESI**. **ESI** now points to the address of a null terminated string variable containing the name of the last function name in the list.
+3. On line **4**, the value pointed to by **EBX** (The list of function names) is added to the sum of **ECX** (Number of exported names) multiplied by **4** and stored in **ESI**. **ESI** now contains the offset from the base of **kernel32** to the last string in the lsit.
 
-4. The hash is then calculated from the function name. This process is covered in detail in the [previous](https://blog.xenoscr.net/Encoding-Decoding-and-Storing-Function-Names/) blog post. If you need to, please refer to it.
+4. **EBP** (kernel32.dll's Base Address) is added to **ESI** on line **5**. **ESI** now points to the last exported function name, a NULL terminated string.
 
-5. The computed hash stored in the **EDI** register is then compared with the value stored at **ESP** + **0x28**. This was the name of the hash that was pushed to the stack prior to calling the **find_function** function.
+5. On lines **7** through **18** the hash of function name is calculated and stored in **EDI**. This process is covered in detail in the [previous](https://blog.xenoscr.net/Encoding-Decoding-and-Storing-Function-Names/) blog post. If you need to, please refer to it.
 
-6. If the values do not match, the loop moves to the next function name. If a match is found it continues on.
+6. The computed hash, stored in the **EDI** register, is compared with the value stored at [**ESP** + **0x28**] on line **20**. The hashed function names is stored at that location. It was pushed to the stack prior to calling the **find_function** function.
 
-7. The next few steps can be a bit hard to follow, we will refer to **Figure 2** to help follow along with what is happening. **EDX** (Export Table's Base Address) + **0x24** is stored in **EBX**. **EBX** now contains the offset of the list of function addresses from the base of **Kernel32**.
+7. If the values do not match, the loop moves to the next function name. If a match is found it continues on.
+
+8. The next few steps (line **22** through **28**)  can be a bit difficult to follow, please refer to **Figure 2** to help follow along. **0x24** is added to **EDX** (_IMAGE_EXPORT_DIRECTORY Structure) and stored in **EBX** on line **22**. According to the _IMAGE_EXPORT_DIRECTORY structure in **Figure 1**, the **AddressOfOrdinals** is located at an offset of **0x24**. This variable contains the relative offset of a list of ordinal values that correspond with exported functions.
 
 <p align="center">
     <img src="/resources/images/2020-02-10-Locating-Win32-API-Functions/figure2.png" alt="Figure 2: Export Table Visualization">
@@ -260,21 +286,22 @@ The next section of code will iterate the list of function names that is now sto
     <em>Figure 2: Export Table Visualization</em>
 </p>
 
-8. **EBP** (Kernel32's Base Address) is added to **EBX** so that **EBX** now points to a list of function ordinals. Not all functions are named and exported. The ordinal list contains the function number of only the named exported functions. See **Figure 2** for a visual.
+{:start="9"}
+9. On line **23**, **EBP** (kernel32.dll's Base Address) is added to **EBX**. **EBX** now points to the list of ordinals referenced by the **AddressOfOrdinals** variable.
 
-9. **EBX** (Ordinal Base Address) is added to **ECX** (Function number) * 2, since the ordinals are twice the size of the function number, and stored in **CX**. **ECX** now contains the true function number.
+10. **EBX** (Ordinal list address) is added to the sum of **ECX** (Function number) multiplied by 2 and stored in **CX**. **CX** now contains the offset in the **AddressOfFunctions** list that will contain the function address that is being searched for.
 
-10. **0x1C** is added to **EDX** (Export Table Base Address) and stored in **EBX**. **EBX** now contains the offset of the list of function addresses from the base of **Kernel32**.
+11. **0x1C** is added to **EDX** (_IMAGE_EXPORT_DIRECTORY Structure) and stored in **EBX** on line **25**. **EBX** now contains the offset of the **AddressOfFunctions** variable in the **_IMAGE_EXPORT_DIRECTORY** structure.
 
-11. **EBP** (Kernel32's Base Address) is added to **EBX** to make **EBX** point to the list of function addresses.
+12. On line **26**, **EBP** (kernel32.dll's Base Address) is added to **EBX** to make **EBX** point to the list of function addresses.
 
-12. **ECX** (The function number) * 4 is added to **EBX** (The function address list) and stored in **EAX**. **EAX** now contains the offset from the base of **Kernel32** of the location containing the address of the desired function.
+13. On line **27**, **ECX** (The function number) is multiplied by 4 and added to **EBX** (The function address list) and stored in **EAX**. **EAX** now contains the offset from the base of **kernel32.dll** to the address of the function that is being searched for.
 
-13. **EAX** (Offset to function address) is added to **EBP** (Kernel32's Base Address) so that **EAX** now contains the address of the function we are looking for.
+14. On line **28**, **EAX** (Offset to function address) is added to **EBP** (kernel32.dll's Base Address). **EAX** now contains the address of the function that is being searched for.
 
-14. The value is stored at **ESP** + **0x1C**, which contains the value of **EDI** that was pushed to the stack by the **PUSHAD** command at the beginning of the function. This stores the functions address where we can later reference it as needed.
+15. The value is stored at [**ESP** + **0x1C**], which contains the value of **EDI** that was pushed to the stack by the **PUSHAD** command at the beginning of the function. This stores the functions address where we can later reference it as needed.
 
-15. The **POPAD** function restores the registers from the stack to their previous state and execution returns to the **resolve_symbols_for_dll** function.
+16. The **POPAD** function restores the registers from the stack to their previous state and execution returns to the **resolve_symbols_for_dll** function.
 
 # Now, Again But 64-Bit
 I'm going to dispense with the play-by-play for the 64-Bit version of this assembly code. I will point out a few of the differences. The following assembly program will locate the address of two functions: **LoadLibraryA** and **CreateProcessA**.
@@ -376,13 +403,13 @@ _start:
 {% endhighlight %}
 
 ## Missing Commands?
-When operating in 64-bit with Assembly, there are a few commands that are no longer exist, or are not useful anymore. **PUSHAD** and **POPAD** do not work on 64-bit registers. This being the case, they're of no use and we needed to find an alternative. The **LODSB** command also does not work in 64-bit. It was necessary to replace it with a **MOV AL, [RSI]** and **INC RSI** sequence. It does the exact same thing, only with more bytes and instructions.
+When operating in 64-bit with Assembly, there are a few commands that no longer exist, or are not useful anymore. **PUSHAD** and **POPAD** do not work on 64-bit registers. This being the case, they're of no use and we needed to find an alternative. The **LODSB** command also does not work on 64-bit registers. It was necessary to replace it with a **MOV AL, [RSI]** and **INC RSI** sequence. It does the exact same thing, only with more bytes and instructions.
 
 ## Register Differences
 64-bit Assembly has many more registers available. Registers **R8** through **R15** have been added. That gives us  **8** new places to store things that we need. With this additional storage it was fairly easy to compensate for the missing **PUSHAD** and **POPAD** commands. There are some consideration however. To do anything with the function addresses we find now later, we will need to call the functions. 64-Bit **stdcall** function calls are a bit different according to the [documentation](https://docs.microsoft.com/en-us/cpp/build/x64-calling-convention?view=vs-2019). According to the section on [Parameter passing](https://docs.microsoft.com/en-us/cpp/build/x64-calling-convention?view=vs-2019#parameter-passing), the **R8**, and **R9** registers are used to pass the 3rd and 4th parameters to a function. We should avoid storing anything long-term in them. The same goes for the **RCX** and **RDX** parameters.
 
 ## PE File Offset Differences
-I was able to skip finding the DOS header offset at **0x24** and skip straight to finding the **PE Header** offset value at offset **0x3C**. From there, finding the offset of the **_IMAGE_EXPORT_DIRECTORY** was a little different. Examining the table dump of the **_IMAGE_DOS_HEADER** and **_IMAGE_NT_HEADERS64** from **WinDbg** in **Figure 3**, we can see that the layout is a bit different. The **_IMAGE_DATA_DIRECTORY** is located at an offset of **0x70** from the **OptionalHeader** at offset **0x18**. That means that the total offset needs to be **0x88**, not **0x78** as it was in 32-Bit mode. 
+The **PE Header** offset value is still at the offset of **0x3C** from the base of **kernel32.dll**. From there, finding the offset of the **_IMAGE_EXPORT_DIRECTORY** was a little different. Examining the table dump of the **_IMAGE_DOS_HEADER** and **_IMAGE_NT_HEADERS64** from **WinDbg** in **Figure 3**, we can see that the layout is just slightly different. The **_IMAGE_DATA_DIRECTORY** is located at an offset of **0x70** from the **OptionalHeader** at offset **0x18**. That means that the total offset needs to be **0x88**, not **0x78** as it was in 32-Bit mode. The good news is that the layout of the **IMAGE_DATA_DIRECTORY** is still the same as in **Figure 1**.
 
 {% highlight text %}
 0:001> dt _IMAGE_DOS_HEADER 77260000
