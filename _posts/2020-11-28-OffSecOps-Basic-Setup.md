@@ -64,6 +64,7 @@ Install the versions of Microsoft's Visual Studio Community that you will need t
     <em>Figure 1: Extract OpenJDK</em>
 </p>
 
+{:start="3"}
 3. Add the path **C:\\Program Files\\OpenJDK\\jdk-11\\bin** to the System Path.
 
 <p align="center">
@@ -73,6 +74,7 @@ Install the versions of Microsoft's Visual Studio Community that you will need t
     <em>Figure 2: Add OpenJDK to the System PATH variable</em>
 </p>
 
+{:start="4"}
 4. Add a new System Environment Variable named **JAVA_HOME** and a value that matches the path of your JDK.
 
 <p align="center">
