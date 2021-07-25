@@ -8,7 +8,7 @@ I am a hopeless knowledge seeker. I have a drive to learn how things work, to be
 
 ### More Information
 
-OSCP & OSCE certified professional with over 20 years in Information technology and Information Security experience.
+OSCP, OSWE, & OSCE certified professional with over 20 years in Information technology and Information Security experience.
 
 ### Contact me
 
