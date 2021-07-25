@@ -20,8 +20,6 @@
 
 title: "Conor Richard"
 name: "Conor Richard"
-twitter: "xenoscr"
-github: "github.com/xenoscr"
 email: ""
 description: >- # this means to ignore newlines until "baseurl:"
     Information Security Professional and Armature Researcher
@@ -30,6 +28,10 @@ url: "" # the base hostname & protocol for your site, e.g. http://example.com
 twitter_username: xenoscr
 github_username:  xenoscr
 avatar: https://raw.githubusercontent.com/xenoscr/xenoscr.github.io/master/images/xenoscr.png
+
+footer-links:
+    twitter: xenoscr
+    github: xenoscr
 
 # Build settings
 theme: minima
