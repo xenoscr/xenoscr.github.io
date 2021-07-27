@@ -221,7 +221,7 @@ call [ebp+0x08]            ; Call CreateProcessW
 ## Injecting Code into the Suspended Process
 For this blog, the instructions that will be injected into the suspended process will execute calc.exe for demonstration purposes. The final version of the shellcode will inject a modified version of itself into the suspended process. To inject the instructions into the suspended process the assembly code will need to:
 
-1. Get the thread information from the suspended process and store the information in a **CONTEXT** object using **GetGhreadContext**, stored at **[EBP+0x10]**.
+1. Get the thread information from the suspended process and store the information in a **CONTEXT** object using **GetThreadContext**, stored at **[EBP+0x10]**.
 2. Allocate space for the code to be injected using **VirtualAllocEx**, stored at **[EBP+0x14]**.
 3. Change the active thread stored in the **CONTEXT** object.
 4. Write the injected code to the allocated space using **WriteProcessMemory**, stored at **[EBP+0x18]**.
