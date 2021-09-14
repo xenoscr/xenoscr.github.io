@@ -1,0 +1,13 @@
+---
+layout: default
+---
+<div class="masthead">
+    <a href="{{ site.baseurl }}/" class="site-avatar"><img src="{{ site.avatar }}" /></a>
+    <a href="{{ "/" | relative_url }}">{{ site.theme_config.back_home_text }}</a>
+</div>
+
+<header>
+  <h1>{{ site.title }}</h1>
+</header>
+
+{% include post_list.html %}

@@ -1,7 +1,6 @@
 ---
 layout: default
 ---
-
 <div class="masthead">
     <a href="{{ site.baseurl }}/" class="site-avatar"><img src="{{ site.avatar }}" /></a>
     <h1 class="site-name">
@@ -11,5 +10,4 @@ layout: default
 <a class="nav-home" href="{{ "/" | relative_url }}">{{ site.theme_config.back_home_text }}</a>
 <div class="dashed"></div>
 <h1 class="post-title">{{ page.title }}</h1>
-{% include date_and_social_share.html %}
 {{ content }}

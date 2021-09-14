@@ -1,0 +1,10 @@
+@mixin dark-appearance {
+  html, body  {
+      --bg: #1f242A;
+      --bg-secondary: #323945;
+      --headings: #FFFFFFFF;
+      --text: #adb5bd;
+      --links: #91a7ff;
+      --highlight: #ffd43b;
+  };
+}
