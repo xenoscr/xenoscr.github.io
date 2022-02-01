@@ -56,7 +56,7 @@ theme_config:
    # title_old_projects: Old Projects
     
 # Build settings
-theme: moonwalk
+#theme: moonwalk
 plugins:
   - jekyll-feed
     
