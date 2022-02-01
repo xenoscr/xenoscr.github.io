@@ -399,7 +399,7 @@ end
 Code 07: x86 Assembly InstrumentationCallbackProxy
 {:.label}
 
-# # x64 Specific Changes
+# x64 Specific Changes
 
 Not much of the core functionality was changed for the x64 version of the code from the original. The main functional differences are in the Assembly language used in the callback. Most notably:
 
